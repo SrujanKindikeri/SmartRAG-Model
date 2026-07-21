@@ -14,5 +14,21 @@
     {
         "user": "new library rules ?",
         "assistant": "The new library rules include the following key regulations:  \n\n- **Prohibited Items**:  \n  - No eatables, soft drinks, or personal books allowed.  \n  - Eatables and soft drinks are strictly prohibited.  \n\n- **Behavior Rules**:  \n  - No discussions, loud noises, or disturbances to other users.  \n  - Misbehavior with library staff invites severe disciplinary action.  \n  - Movement of library furniture is prohibited.  \n\n- **Usage Rules**:  \n  - Library visits must be for academic purposes only; leisurely sitting is not allowed.  \n  - Electronic gadgets (e.g., mobile phones, laptops) require staff permission.  \n  - Mobile phones must be on silent or switched off.  \n  - Laptops are allowed only if they operate quietly.  \n  - Viewing, sending, or downloading offensive content is prohibited.  \n\n- **Identity Requirements**:  \n  - Wearing an identity card is mandatory; cards cannot be lent to others.  \n  - Changes to ID details must be reported immediately.  \n\n- **Consequences**:  \n  - Violations may result in disciplinary action, including debit notes for damages.  \n\nThese rules aim to maintain a quiet, respectful"
+    },
+    {
+        "user": "What is the minimum attendance required?",
+        "assistant": "I couldn't find enough information in the provided documents."
+    },
+    {
+        "user": "What is the minimum attendance required?",
+        "assistant": "Answer: I couldn't find enough information in the provided documents."
+    },
+    {
+        "question": "What is the minimum attendance required?",
+        "answer": "The minimum attendance requirements, as specified in the provided documents, are as follows:  \n\n1. **Aggregate Attendance**:  \n   - **75%** in aggregate (Document 3).  \n   - **80%** in aggregate (Document 1 and Document 2).  \n\n2. **Individual Course Attendance**:  \n   - **75%** in an individual course to appear in ETE and earn marks (Document 2).  \n   - **65%** in an individual course (Document 3).  \n\n**Note**: There is a discrepancy in the documents. Document 2 mentions a relaxation of 5% for medical or genuine reasons, allowing 75% aggregate attendance. Document 3 specifies 75% aggregate but 65% for individual courses. For clarity, the strictest requirement (75% aggregate and 75% in individual courses) is highlighted. If the answer is missing from the context, it would state: \"I couldn't find enough information in the provided documents.\" However, the above details are explicitly mentioned."
+    },
+    {
+        "question": "What are hostel timings?",
+        "answer": "The hostel attendance timings, as specified in the provided documents, are as follows:  \n\n**Attendance Timings by Period**:  \n- **01st May – 31st October**: **8:00 PM**  \n- **01st November – 28th February**: **7:00 PM**  \n- **01st March – 30th April**: **7:30 PM**  \n\nThese timings apply to all hostel residents and are for physical verification by the warden.  \n\n**Note**: The documents mention these timings for attendance checks but do not specify additional timings for other activities (e.g., meals)."
     }
 ]

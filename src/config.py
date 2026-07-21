@@ -2,6 +2,21 @@
 =========================================================
 SmartRAG Configuration
 =========================================================
+
+Central configuration for the entire SmartRAG project.
+
+Project Structure
+-----------------
+SmartRAG/
+│
+├── data/
+├── logs/
+├── metadata/
+├── models/
+├── src/
+├── vector_db/
+└── history.json
+=========================================================
 """
 
 from pathlib import Path
@@ -18,24 +33,29 @@ VECTOR_DB_DIR = PROJECT_ROOT / "vector_db"
 
 MODELS_DIR = PROJECT_ROOT / "models"
 
+METADATA_DIR = PROJECT_ROOT / "metadata"
+
+LOG_DIR = PROJECT_ROOT / "logs"
+
+INDEX_FILE = METADATA_DIR / "index.json"
+
 MEMORY_FILE = PROJECT_ROOT / "history.json"
 
-UNANSWERED_FILE = PROJECT_ROOT / "unanswered_questions.json"
-
 # =========================================================
-# Embedding Model
+# Create Required Directories
 # =========================================================
 
-EMBEDDING_MODEL = "BAAI/bge-small-en-v1.5"
+for directory in [
+    DATA_DIR,
+    VECTOR_DB_DIR,
+    MODELS_DIR,
+    METADATA_DIR,
+    LOG_DIR,
+]:
+    directory.mkdir(parents=True, exist_ok=True)
 
 # =========================================================
-# Ollama Model
-# =========================================================
-
-OLLAMA_MODEL = "qwen3:8b"
-
-# =========================================================
-# Chunk Configuration
+# Chunking Configuration
 # =========================================================
 
 CHUNK_SIZE = 500
@@ -43,12 +63,12 @@ CHUNK_SIZE = 500
 CHUNK_OVERLAP = 100
 
 # =========================================================
-# Retrieval
+# Embedding Model
 # =========================================================
 
-TOP_K = 10
+EMBEDDING_MODEL = "BAAI/bge-small-en-v1.5"
 
-RERANK_TOP_K = 5
+EMBEDDING_BATCH_SIZE = 32
 
 # =========================================================
 # ChromaDB
@@ -56,44 +76,82 @@ RERANK_TOP_K = 5
 
 COLLECTION_NAME = "smartrag"
 
+TOP_K = 5
+
+RERANK_TOP_K = 3
+
 # =========================================================
-# LLM
+# Cross Encoder
 # =========================================================
+
+RERANK_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+
+# =========================================================
+# Ollama
+# =========================================================
+
+OLLAMA_MODEL = "qwen3:8b"
 
 TEMPERATURE = 0.2
 
 TOP_P = 0.9
 
-MAX_TOKENS = 512
+MAX_TOKENS = 1024
 
 # =========================================================
 # Conversation Memory
 # =========================================================
 
-# Number of conversations to keep on disk
-MAX_HISTORY = 100
+MAX_HISTORY = 10
 
-# Number of recent conversations to include in prompts
-MEMORY_CONTEXT_LIMIT = 10
-
-# =========================================================
-# Supported Files
-# =========================================================
-
-SUPPORTED_FILES = [
-    ".pdf",
-    ".docx",
-    ".txt"
-]
-
-# =========================================================
-# OCR
-# =========================================================
-
-ENABLE_OCR = False
+MEMORY_CONTEXT_LIMIT = 3000
 
 # =========================================================
 # Logging
 # =========================================================
 
+APP_LOG = LOG_DIR / "application.log"
+
+ERROR_LOG = LOG_DIR / "error.log"
+
+INDEX_LOG = LOG_DIR / "index.log"
+
+# =========================================================
+# Feature Flags
+# =========================================================
+
+ENABLE_RERANK = True
+
+ENABLE_STREAMING = True
+
+ENABLE_INCREMENTAL_INDEXING = True
+
+ENABLE_DUPLICATE_CHECK = True
+
 DEBUG = True
+
+# =========================================================
+# Supported File Types
+# =========================================================
+
+SUPPORTED_EXTENSIONS = {
+    ".pdf",
+    ".docx",
+    ".txt",
+}
+
+# =========================================================
+# Prompt Settings
+# =========================================================
+
+SYSTEM_NAME = "SmartRAG"
+
+NO_CONTEXT_RESPONSE = (
+    "I couldn't find enough information in the provided documents."
+)
+
+# =========================================================
+# Version
+# =========================================================
+
+VERSION = "2.0.0"

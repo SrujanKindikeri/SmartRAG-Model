@@ -1,42 +1,37 @@
 """
 =========================================================
-SmartRAG
----------------------------------------------------------
-Complete Retrieval-Augmented Generation Pipeline
+SmartRAG Engine
+=========================================================
 
-Flow
+Coordinates
 
-User Question
-      │
-      ▼
-Semantic Search
-      │
-      ▼
-Cross Encoder Reranker
-      │
-      ▼
-Conversation Memory
-      │
-      ▼
+Search
+↓
+
+Reranker
+↓
+
 Prompt Builder
-      │
-      ▼
-Qwen3 (Ollama)
-      │
-      ▼
-Final Answer
+↓
+
+LLM
+↓
+
+Memory
+
 =========================================================
 """
 
-from search import SemanticSearch
+from search import SearchEngine
 from reranker import Reranker
 from prompt_builder import PromptBuilder
 from llm import LLM
 from memory import ConversationMemory
 
 from config import (
-    TOP_K,
-    RERANK_TOP_K
+    ENABLE_RERANK,
+    RERANK_TOP_K,
+    NO_CONTEXT_RESPONSE
 )
 
 
@@ -44,91 +39,168 @@ class SmartRAG:
 
     def __init__(self):
 
-        print("=" * 70)
-        print("Initializing SmartRAG...")
-        print("=" * 70)
+        print("\nInitializing SmartRAG...")
 
-        self.search = SemanticSearch()
+        self.search = SearchEngine()
 
         self.reranker = Reranker()
-
-        self.memory = ConversationMemory()
 
         self.prompt_builder = PromptBuilder()
 
         self.llm = LLM()
 
-        print("✓ Semantic Search Loaded")
+        self.memory = ConversationMemory()
 
-        print("✓ Cross Encoder Loaded")
+        print("SmartRAG Ready.\n")
 
-        print("✓ Conversation Memory Loaded")
+    # =====================================================
+    # Retrieve Documents
+    # =====================================================
 
-        print("✓ Prompt Builder Loaded")
+    def retrieve(
+        self,
+        question
+    ):
 
-        print("✓ Ollama Loaded")
+        retrieval = self.search.retrieve(question)
 
-        print("=" * 70)
-        print("SmartRAG Ready")
-        print("=" * 70)
+        results = retrieval["results"]
 
-    # ====================================================
-    # Ask Question
-    # ====================================================
+        if ENABLE_RERANK and results:
 
-    def ask(self, question):
+            results = self.reranker.rerank(
 
-        question = question.strip()
+                query=question,
 
-        if question == "":
-            return (
-                "Please enter a valid question.",
-                []
+                results=results,
+
+                top_k=RERANK_TOP_K
+
             )
+
+        context = self.search.build_context(results)
+
+        sources = self.search.get_sources(results)
+
+        return {
+
+            "results": results,
+
+            "context": context,
+
+            "sources": sources
+
+        }
+
+    # =====================================================
+    # Build Prompt
+    # =====================================================
+
+    def create_prompt(
+        self,
+        question,
+        context
+    ):
+
+        history = self.memory.recent()
+
+        if context.strip():
+
+            return self.prompt_builder.build_prompt(
+
+                question=question,
+
+                context=context,
+
+                history=history
+
+            )
+
+        return self.prompt_builder.build_no_context_prompt(
+
+            question=question,
+
+            history=history
+
+        )
+    # =====================================================
+    # Ask SmartRAG
+    # =====================================================
+
+    def ask(
+        self,
+        question: str
+    ):
 
         try:
 
+            question = question.strip()
+
+            if not question:
+
+                return {
+
+                    "question": "",
+
+                    "answer": "Please enter a valid question.",
+
+                    "sources": [],
+
+                    "context": ""
+
+                }
+
             # ---------------------------------------------
-            # Retrieve Documents
+            # Retrieve Relevant Documents
             # ---------------------------------------------
 
-            retrieved_chunks = self.search.search(
-                question,
-                top_k=TOP_K
-            )
+            retrieval = self.retrieve(question)
 
-            if len(retrieved_chunks) == 0:
+            context = retrieval["context"]
 
-                return (
-                    "I couldn't find any relevant information in the knowledge base.",
-                    []
+            sources = retrieval["sources"]
+
+            results = retrieval["results"]
+
+            # ---------------------------------------------
+            # No Context Found
+            # ---------------------------------------------
+
+            if not context.strip():
+
+                answer = NO_CONTEXT_RESPONSE
+
+                self.memory.add(
+
+                    question,
+
+                    answer
+
                 )
 
-            # ---------------------------------------------
-            # Rerank Results
-            # ---------------------------------------------
+                return {
 
-            ranked_chunks = self.reranker.rerank(
+                    "question": question,
 
-                question,
+                    "answer": answer,
 
-                retrieved_chunks,
+                    "sources": [],
 
-                top_n=RERANK_TOP_K
+                    "context": "",
 
-            )
+                    "results": []
+
+                }
 
             # ---------------------------------------------
             # Build Prompt
             # ---------------------------------------------
 
-            prompt, sources = self.prompt_builder.build_prompt(
+            prompt = self.create_prompt(
 
                 question,
 
-                ranked_chunks,
-
-                self.memory
+                context
 
             )
 
@@ -136,7 +208,11 @@ class SmartRAG:
             # Generate Answer
             # ---------------------------------------------
 
-            answer = self.llm.generate(prompt)
+            answer = self.llm.generate(
+
+                prompt
+
+            )
 
             # ---------------------------------------------
             # Save Conversation
@@ -150,53 +226,196 @@ class SmartRAG:
 
             )
 
-            return answer, sources
+            # ---------------------------------------------
+            # Return Response
+            # ---------------------------------------------
+
+            return {
+
+                "question": question,
+
+                "answer": answer,
+
+                "sources": sources,
+
+                "context": context,
+
+                "results": results
+
+            }
 
         except Exception as e:
 
-            return (
-                f"SmartRAG Error : {str(e)}",
-                []
-            )
+            return {
 
-    # ====================================================
+                "question": question,
+
+                "answer": f"SmartRAG Error : {str(e)}",
+
+                "sources": [],
+
+                "context": "",
+
+                "results": []
+
+            }
+
+    # =====================================================
+    # Chat Alias
+    # =====================================================
+
+    def chat(
+        self,
+        question
+    ):
+
+        return self.ask(question)
+    # =====================================================
     # Clear Conversation Memory
-    # ====================================================
+    # =====================================================
 
     def clear_memory(self):
 
         self.memory.clear()
 
-        print("Conversation history cleared.")
+        print("Conversation memory cleared.")
 
-    # ====================================================
-    # Show Memory
-    # ====================================================
+    # =====================================================
+    # Statistics
+    # =====================================================
 
-    def show_memory(self):
+    def statistics(self):
 
-        history = self.memory.load()
+        return {
 
-        if len(history) == 0:
+            "documents": self.search.database.count(),
 
-            print("No conversation history.")
+            "conversations": self.memory.count(),
+
+            "reranking": ENABLE_RERANK,
+
+            "llm_model": self.llm.model,
+
+            "embedding_model": self.search.embedder.info()["model"]
+
+        }
+
+    # =====================================================
+    # Print Statistics
+    # =====================================================
+
+    def print_statistics(self):
+
+        stats = self.statistics()
+
+        print("\n" + "=" * 60)
+        print("SmartRAG Statistics")
+        print("=" * 60)
+
+        print(f"Indexed Chunks     : {stats['documents']}")
+        print(f"Conversations      : {stats['conversations']}")
+        print(f"Reranking Enabled  : {stats['reranking']}")
+        print(f"Embedding Model    : {stats['embedding_model']}")
+        print(f"LLM Model          : {stats['llm_model']}")
+
+        print("=" * 60)
+
+    # =====================================================
+    # Health Check
+    # =====================================================
+
+    def health(self):
+
+        return {
+
+            "status": "healthy",
+
+            "database": self.search.database.test_connection(),
+
+            "vectors": self.search.database.count(),
+
+            "llm": self.llm.test_connection(),
+
+            "memory": self.memory.count(),
+
+            "reranker": self.reranker.health()["status"]
+
+        }
+
+    # =====================================================
+    # Print Health
+    # =====================================================
+
+    def print_health(self):
+
+        health = self.health()
+
+        print("\n" + "=" * 60)
+        print("SmartRAG Health")
+        print("=" * 60)
+
+        for key, value in health.items():
+
+            print(f"{key.capitalize():15}: {value}")
+
+        print("=" * 60)
+
+    # =====================================================
+    # Show Sources
+    # =====================================================
+
+    def print_sources(
+        self,
+        sources
+    ):
+
+        print("\nSources")
+
+        if not sources:
+
+            print("No source documents.")
 
             return
 
-        print("=" * 70)
+        for source in sources:
 
-        print("Conversation History")
+            print(f" - {source}")
+# =====================================================
+# Testing
+# =====================================================
 
-        print("=" * 70)
+if __name__ == "__main__":
 
-        for index, chat in enumerate(history, start=1):
+    rag = SmartRAG()
 
-            print(f"\nConversation {index}")
+    rag.print_statistics()
 
-            print("-" * 50)
+    rag.print_health()
 
-            print(f"User      : {chat['user']}")
+    while True:
 
-            print(f"Assistant : {chat['assistant']}")
+        print()
 
-        print("=" * 70)
+        question = input("You > ").strip()
+
+        if question.lower() in [
+
+            "exit",
+
+            "quit"
+
+        ]:
+
+            break
+
+        response = rag.ask(question)
+
+        print("\nAssistant\n")
+
+        print(response["answer"])
+
+        rag.print_sources(
+
+            response["sources"]
+
+        )

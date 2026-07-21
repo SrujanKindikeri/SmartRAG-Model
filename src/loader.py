@@ -1,125 +1,260 @@
-import fitz
-from docx import Document
-from pathlib import Path
+"""
+=========================================================
+SmartRAG Document Loader
+=========================================================
 
-from config import DATA_DIR, SUPPORTED_FILES
+Supported Formats
+-----------------
+✓ PDF
+✓ DOCX
+✓ TXT
+
+Features
+--------
+✓ SHA256 Hashing
+✓ Metadata Extraction
+✓ Automatic File Discovery
+✓ Error Handling
+✓ Duplicate Detection Support
+=========================================================
+"""
+
+import hashlib
+from pathlib import Path
+from typing import Dict, List
+
+import fitz                  # PyMuPDF
+from docx import Document
+
+from config import (
+    DATA_DIR,
+    SUPPORTED_EXTENSIONS
+)
 
 
 class DocumentLoader:
-    """
-    Loads PDF, DOCX and TXT documents from the data directory.
-    """
 
     def __init__(self):
+
         self.data_dir = DATA_DIR
 
-    # -------------------------------------------------------
-    # Load Every Document
-    # -------------------------------------------------------
+    # =====================================================
+    # SHA256
+    # =====================================================
 
-    def load_documents(self):
+    def calculate_hash(self, filepath: Path) -> str:
+
+        sha = hashlib.sha256()
+
+        with open(filepath, "rb") as file:
+
+            while True:
+
+                chunk = file.read(8192)
+
+                if not chunk:
+                    break
+
+                sha.update(chunk)
+
+        return sha.hexdigest()
+
+    # =====================================================
+    # PDF
+    # =====================================================
+
+    def read_pdf(self, filepath: Path) -> str:
+
+        document = fitz.open(filepath)
+
+        pages = []
+
+        for page in document:
+
+            pages.append(page.get_text())
+
+        document.close()
+
+        return "\n".join(pages)
+
+    # =====================================================
+    # DOCX
+    # =====================================================
+
+    def read_docx(self, filepath: Path) -> str:
+
+        document = Document(filepath)
+
+        paragraphs = []
+
+        for para in document.paragraphs:
+
+            text = para.text.strip()
+
+            if text:
+
+                paragraphs.append(text)
+
+        return "\n".join(paragraphs)
+
+    # =====================================================
+    # TXT
+    # =====================================================
+
+    def read_txt(self, filepath: Path) -> str:
+
+        with open(
+            filepath,
+            "r",
+            encoding="utf-8",
+            errors="ignore"
+        ) as file:
+
+            return file.read()
+
+    # =====================================================
+    # Read Any File
+    # =====================================================
+
+    def read_file(self, filepath: Path) -> str:
+
+        suffix = filepath.suffix.lower()
+
+        if suffix == ".pdf":
+
+            return self.read_pdf(filepath)
+
+        elif suffix == ".docx":
+
+            return self.read_docx(filepath)
+
+        elif suffix == ".txt":
+
+            return self.read_txt(filepath)
+
+        else:
+
+            raise ValueError(f"Unsupported file: {filepath}")
+
+    # =====================================================
+    # Load Single File
+    # =====================================================
+
+    def load_file(self, filepath: Path) -> Dict:
+
+        text = self.read_file(filepath)
+
+        return {
+
+            "filename": filepath.name,
+
+            "filepath": str(filepath.resolve()),
+
+            "extension": filepath.suffix.lower(),
+
+            "hash": self.calculate_hash(filepath),
+
+            "size": filepath.stat().st_size,
+
+            "text": text.strip()
+
+        }
+
+    # =====================================================
+    # Discover Files
+    # =====================================================
+
+    def discover_files(self) -> List[Path]:
+
+        files = []
+
+        for extension in SUPPORTED_EXTENSIONS:
+
+            files.extend(
+
+                self.data_dir.rglob(f"*{extension}")
+
+            )
+
+        return sorted(files)
+
+    # =====================================================
+    # Load All Documents
+    # =====================================================
+
+    def load_documents(self) -> List[Dict]:
 
         documents = []
 
-        if not self.data_dir.exists():
-            print(f"Data directory not found: {self.data_dir}")
-            return documents
+        files = self.discover_files()
 
         print("=" * 60)
-        print("Loading Documents...")
+        print(f"Found {len(files)} documents")
         print("=" * 60)
 
-        for file in self.data_dir.rglob("*"):
-
-            if not file.is_file():
-                continue
-
-            if file.suffix.lower() not in SUPPORTED_FILES:
-                continue
+        for filepath in files:
 
             try:
 
-                if file.suffix.lower() == ".pdf":
-                    text = self._load_pdf(file)
+                document = self.load_file(filepath)
 
-                elif file.suffix.lower() == ".docx":
-                    text = self._load_docx(file)
+                documents.append(document)
 
-                elif file.suffix.lower() == ".txt":
-                    text = self._load_txt(file)
-
-                else:
-                    continue
-
-                if text.strip():
-
-                    documents.append({
-                        "filename": file.name,
-                        "path": str(file),
-                        "type": file.suffix.lower(),
-                        "text": text
-                    })
-
-                    print(f"Loaded : {file.name}")
+                print(f"Loaded : {filepath.name}")
 
             except Exception as e:
-                print(f"Failed : {file.name}")
+
+                print(f"Failed : {filepath.name}")
+
                 print(e)
 
         print("=" * 60)
-        print(f"Documents Loaded : {len(documents)}")
+        print(f"Successfully Loaded : {len(documents)}")
         print("=" * 60)
 
         return documents
 
-    # -------------------------------------------------------
-    # PDF
-    # -------------------------------------------------------
+    # =====================================================
+    # Statistics
+    # =====================================================
 
-    def _load_pdf(self, path):
+    def statistics(self):
 
-        pdf = fitz.open(path)
+        files = self.discover_files()
 
-        text = ""
+        return {
 
-        for page in pdf:
-            text += page.get_text()
+            "directory": str(self.data_dir),
 
-        pdf.close()
+            "documents": len(files),
 
-        return text
+            "extensions": sorted(
+                list(SUPPORTED_EXTENSIONS)
+            )
 
-    # -------------------------------------------------------
-    # DOCX
-    # -------------------------------------------------------
+        }
 
-    def _load_docx(self, path):
 
-        doc = Document(path)
+# =========================================================
+# Testing
+# =========================================================
 
-        return "\n".join(
-            paragraph.text
-            for paragraph in doc.paragraphs
-        )
+if __name__ == "__main__":
 
-    # -------------------------------------------------------
-    # TXT
-    # -------------------------------------------------------
+    loader = DocumentLoader()
 
-    def _load_txt(self, path):
+    stats = loader.statistics()
 
-        with open(path, "r", encoding="utf-8", errors="ignore") as file:
-            return file.read()
+    print(stats)
 
-    # -------------------------------------------------------
-    # Loader Information
-    # -------------------------------------------------------
+    documents = loader.load_documents()
 
-    def info(self):
+    print()
 
-        print("=" * 60)
-        print("Document Loader")
-        print("=" * 60)
-        print(f"Data Folder : {self.data_dir}")
-        print(f"Supported   : {SUPPORTED_FILES}")
-        print("=" * 60)
+    for doc in documents:
+
+        print(doc["filename"])
+        print(doc["hash"][:20])
+        print(doc["size"])
+        print("-" * 40)
+        

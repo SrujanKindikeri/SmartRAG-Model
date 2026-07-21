@@ -1,113 +1,213 @@
 """
 =========================================================
-SmartRAG Text Chunker
+SmartRAG Document Chunker
 =========================================================
 
-Splits documents into overlapping chunks while assigning
-globally unique IDs to every chunk.
+Features
+--------
+✓ Fixed-size Chunking
+✓ Overlapping Chunks
+✓ UUID Chunk IDs
+✓ Metadata Preservation
+✓ Production Ready
+=========================================================
 """
 
 import uuid
+from typing import Dict, List
 
-from config import CHUNK_SIZE, CHUNK_OVERLAP
+from config import (
+    CHUNK_SIZE,
+    CHUNK_OVERLAP
+)
 
 
-class TextChunker:
+class DocumentChunker:
 
     def __init__(self):
+
         self.chunk_size = CHUNK_SIZE
         self.chunk_overlap = CHUNK_OVERLAP
 
-    # -----------------------------------------------------
-    # Chunk All Documents
-    # -----------------------------------------------------
+    # =====================================================
+    # Normalize Text
+    # =====================================================
 
-    def chunk_documents(self, documents):
+    def clean_text(self, text: str) -> str:
 
-        chunks = []
+        text = text.replace("\r", "\n")
 
-        print("=" * 60)
-        print("Chunking Documents...")
-        print("=" * 60)
+        lines = []
 
-        for document in documents:
+        for line in text.split("\n"):
 
-            doc_chunks = self.chunk_text(document)
+            line = line.strip()
 
-            chunks.extend(doc_chunks)
+            if line:
 
-        print(f"Total Chunks Created : {len(chunks)}")
-        print("=" * 60)
+                lines.append(line)
 
-        return chunks
+        return "\n".join(lines)
 
-    # -----------------------------------------------------
-    # Chunk One Document
-    # -----------------------------------------------------
+    # =====================================================
+    # Split Text
+    # =====================================================
 
-    def chunk_text(self, document):
+    def split_text(self, text: str) -> List[str]:
 
-        text = document["text"]
+        text = self.clean_text(text)
 
-        filename = document["filename"]
+        if not text:
 
-        path = document["path"]
+            return []
 
         chunks = []
 
         start = 0
 
-        chunk_number = 1
+        length = len(text)
 
-        text_length = len(text)
+        while start < length:
 
-        while start < text_length:
-
-            end = min(start + self.chunk_size, text_length)
+            end = start + self.chunk_size
 
             chunk = text[start:end].strip()
 
             if chunk:
 
-                chunks.append({
+                chunks.append(chunk)
 
-                    # Completely unique ID
-                    "chunk_id": str(uuid.uuid4()),
-
-                    # Sequential number inside document
-                    "chunk_number": chunk_number,
-
-                    "filename": filename,
-
-                    "path": path,
-
-                    "text": chunk
-
-                })
-
-                chunk_number += 1
-
-            # Stop when end of document is reached
-            if end >= text_length:
-                break
-
-            # Overlapping chunks
-            start = end - self.chunk_overlap
-
-            if start < 0:
-                start = 0
+            start += self.chunk_size - self.chunk_overlap
 
         return chunks
 
-    # -----------------------------------------------------
-    # Information
-    # -----------------------------------------------------
+    # =====================================================
+    # Chunk One Document
+    # =====================================================
 
-    def info(self):
+    def chunk_document(self, document: Dict) -> List[Dict]:
+
+        pieces = self.split_text(document["text"])
+
+        output = []
+
+        for index, piece in enumerate(pieces, start=1):
+
+            output.append({
+
+                "chunk_id": str(uuid.uuid4()),
+
+                "chunk_number": index,
+
+                "filename": document["filename"],
+
+                "filepath": document["filepath"],
+
+                "extension": document["extension"],
+
+                "hash": document["hash"],
+
+                "size": document["size"],
+
+                "text": piece
+
+            })
+
+        return output
+
+    # =====================================================
+    # Chunk Multiple Documents
+    # =====================================================
+
+    def chunk_documents(self, documents: List[Dict]) -> List[Dict]:
+
+        all_chunks = []
+
+        for document in documents:
+
+            chunks = self.chunk_document(document)
+
+            all_chunks.extend(chunks)
+
+        return all_chunks
+
+    # =====================================================
+    # Statistics
+    # =====================================================
+
+    def statistics(self, chunks: List[Dict]):
+
+        if not chunks:
+
+            return {
+
+                "chunks": 0,
+
+                "average_length": 0
+
+            }
+
+        total = sum(
+
+            len(chunk["text"])
+
+            for chunk in chunks
+
+        )
+
+        return {
+
+            "chunks": len(chunks),
+
+            "average_length": total / len(chunks)
+
+        }
+
+    # =====================================================
+    # Preview
+    # =====================================================
+
+    def preview(self, chunks: List[Dict], count: int = 3):
 
         print("=" * 60)
-        print("Text Chunker")
+        print("Chunk Preview")
         print("=" * 60)
-        print(f"Chunk Size    : {self.chunk_size}")
-        print(f"Chunk Overlap : {self.chunk_overlap}")
+
+        for chunk in chunks[:count]:
+
+            print(f"\nChunk #{chunk['chunk_number']}")
+            print(f"File : {chunk['filename']}")
+            print("-" * 60)
+
+            preview = chunk["text"][:250]
+
+            if len(chunk["text"]) > 250:
+
+                preview += "..."
+
+            print(preview)
+
         print("=" * 60)
+
+
+# =========================================================
+# Testing
+# =========================================================
+
+if __name__ == "__main__":
+
+    from loader import DocumentLoader
+
+    loader = DocumentLoader()
+
+    documents = loader.load_documents()
+
+    chunker = DocumentChunker()
+
+    chunks = chunker.chunk_documents(documents)
+
+    print()
+
+    print(chunker.statistics(chunks))
+
+    chunker.preview(chunks)
